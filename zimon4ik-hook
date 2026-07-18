@@ -1,9 +1,15 @@
--- zimon4ik.hook v1.0 — HITBOX + ESP + SPEEDHACK (XENO)
+-- zimon4ik.hook v1.0 — HITBOX + ESP + SPEEDHACK (XENO) — ТОЛЬКО ДЛЯ ИГРЫ 13831863192
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local UserInputService = game:GetService("UserInputService")
+
+-- ПРОВЕРКА PLACE ID
+if game.PlaceId ~= 13831863192 then
+    LocalPlayer:Kick("Этот скрипт только для определённой игры!")
+    return
+end
 
 local hitboxEnabled, hitboxSize, hitboxColor, hitboxConn = false, 10, Color3.fromRGB(255,0,0), nil
 local espEnabled, espConn = false, nil
@@ -245,4 +251,4 @@ end)
 un.MouseButton1Down:Connect(function() disableHitbox(); disableESP(); disableSpeed(); gui:Destroy() end)
 _G.uninject=function() disableHitbox(); disableESP(); disableSpeed(); gui:Destroy() end
 LocalPlayer.CharacterAdded:Connect(function() if hitboxEnabled then task.wait(0.3); enableHitbox() end; if espEnabled then task.wait(0.3); enableESP() end; if speedEnabled then task.wait(0.3); enableSpeed() end end)
-print("zimon4ik v1.0 | Xeno")
+print("zimon4ik v1.0 | Game 13831863192 | Xeno")
