@@ -1,376 +1,804 @@
--- zimon4ik.hook v1.1 — HITBOX + ESP + FULLBRIGHT + SPEED + FOV (XENO)
+-- ============================================================
+-- ZIMON4IK.HOOK V3.0 — ULTIMATE EDITION (CLEAN)
+-- ============================================================
+
+print("Загрузка zimon4ik.hook v3.0...")
+
+local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
+local Wait = library.subs.Wait
+
+-- ============================================================
+-- СОЗДАЁМ ОКНО (БЕЗ ЛИШНЕГО)
+-- ============================================================
+local Window = library:CreateWindow({
+    Name = "zimon4ik.hook v3.0"
+})
+
+-- ============================================================
+-- ФИКС: КЛАВИША V ДЛЯ СКРЫТИЯ UI
+-- ============================================================
+library.configuration.hideKeybind = Enum.KeyCode.V
+
+-- ============================================================
+-- ВКЛАДКИ
+-- ============================================================
+local CombatTab = Window:CreateTab({ Name = "Combat" })
+local VisualTab = Window:CreateTab({ Name = "Visuals" })
+local MiscTab = Window:CreateTab({ Name = "Misc" })
+local SettingsTab = Window:CreateTab({ Name = "Settings" })
+
+-- ============================================================
+-- ГЛОБАЛЬНЫЕ НАСТРОЙКИ
+-- ============================================================
+_G.hitboxEnabled = false
+_G.hitboxSize = 10
+_G.hitboxColor = Color3.fromRGB(255, 255, 255)
+
+_G.espEnabled = false
+_G.nameEspEnabled = false
+_G.boxEspEnabled = false
+_G.healthBarEnabled = false
+_G.nameEspColor = Color3.fromRGB(255, 255, 255)
+_G.boxEspColor = Color3.fromRGB(255, 255, 255)
+
+_G.fullbrightEnabled = false
+_G.speedEnabled = false
+_G.speedValue = 30
+_G.fovEnabled = false
+_G.fovValue = 90
+
+_G.chamsEnabled = false
+_G.chamsMode = "Glow"
+_G.chamsColor = Color3.fromRGB(255, 0, 0)
+
+_G.fogEnabled = false
+_G.fogColor = Color3.fromRGB(255, 255, 255)
+
+_G.autojumpEnabled = false
+
+local blur = nil
+local autojumpThread = nil
+
+-- ============================================================
+-- СЕРВИСЫ
+-- ============================================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
 
-if game.PlaceId ~= 13831863192 then LocalPlayer:Kick("Не та игра!"); return end
+-- ============================================================
+-- BLUR
+-- ============================================================
+local function enableBlur()
+    if not blur or not blur.Parent then
+        blur = Instance.new("BlurEffect")
+        blur.Parent = Lighting
+    end
+    blur.Enabled = true
+    TweenService:Create(blur, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 20}):Play()
+end
 
-local hitboxEnabled, hitboxSize, hitboxColor, hitboxConn = false, 10, Color3.fromRGB(255,255,255), nil
-local espEnabled, espConn = false, nil
-local nameEspEnabled = true
-local nameEspColor = Color3.fromRGB(255,255,255)
-local boxEspEnabled = false
-local boxEspColor = Color3.fromRGB(255,255,255)
-local healthBarEnabled = true
-local fullbrightEnabled, fullbrightConn = false, nil
-local speedEnabled, speedValue, speedConn = false, 30, nil
-local fovEnabled, fovValue, fovConn = false, 90, nil
-local guiVisible = true
-local toggleKey = "V"
+local function disableBlur()
+    if not blur then return end
+    TweenService:Create(blur, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = 0}):Play()
+    task.delay(0.3, function()
+        if blur then blur.Enabled = false end
+    end)
+end
 
+local function destroyBlur()
+    if blur then
+        blur.Enabled = false
+        pcall(function() blur:Destroy() end)
+        blur = nil
+    end
+end
+
+-- ============================================================
+-- ФУНКЦИИ
+-- ============================================================
+local hitboxConn = nil
+local chamConn = nil
+local pulseThread = nil
+local chamObjects = {}
+local fullbrightConn = nil
+local speedConn = nil
+local fovConn = nil
+local fovLoopThread = nil
+local allConnections = {}
+
+local function addConnection(conn)
+    if conn then
+        table.insert(allConnections, conn)
+    end
+    return conn
+end
+
+-- ============================================================
 -- HITBOX
-local function expandHitboxes()
-    for _,p in ipairs(Players:GetPlayers()) do
+-- ============================================================
+function expandHitboxes()
+    if not _G.hitboxEnabled then return end
+    for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
             local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then pcall(function() hrp.Size=Vector3.new(hitboxSize,hitboxSize,hitboxSize); hrp.Transparency=0.3; hrp.Color=hitboxColor; hrp.Material=Enum.Material.Neon end) end
+            if hrp then
+                pcall(function()
+                    hrp.Size = Vector3.new(_G.hitboxSize, _G.hitboxSize, _G.hitboxSize)
+                    hrp.Transparency = 0.3
+                    hrp.Color = _G.hitboxColor
+                    hrp.Material = Enum.Material.Neon
+                    if not hrp:GetAttribute("origSize") then
+                        hrp:SetAttribute("origSize", Vector3.new(2, 2, 1))
+                        hrp:SetAttribute("origTransparency", 1)
+                        hrp:SetAttribute("origColor", Color3.new(1, 1, 1))
+                        hrp:SetAttribute("origMaterial", Enum.Material.Plastic)
+                    end
+                end)
+            end
         end
     end
 end
-local function resetHitboxes()
-    for _,p in ipairs(Players:GetPlayers()) do
-        if p.Character then local hrp=p.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then pcall(function() hrp.Size=Vector3.new(2,2,1); hrp.Transparency=1; hrp.Color=Color3.new(1,1,1); hrp.Material=Enum.Material.Plastic end) end
-        end
-    end
-end
-local function enableHitbox() hitboxEnabled=true; if hitboxConn then hitboxConn:Disconnect() end; hitboxConn=RunService.Heartbeat:Connect(expandHitboxes) end
-local function disableHitbox() hitboxEnabled=false; if hitboxConn then hitboxConn:Disconnect(); hitboxConn=nil end; resetHitboxes() end
 
--- ESP (NAME + BOX + HEALTH BAR)
-local espList = {}
-local function espLoop()
-    for _, item in ipairs(espList) do
-        pcall(function() item.name:Remove() end)
-        pcall(function() item.box:Remove() end)
-        pcall(function() item.hpBg:Remove() end)
-        pcall(function() item.hpBar:Remove() end)
-    end
-    espList = {}
+local function resetHitboxes()
     for _, p in ipairs(Players:GetPlayers()) do
-        if p == LocalPlayer then continue end
-        if not p.Character then continue end
-        local head = p.Character:FindFirstChild("Head")
-        if not head then continue end
-        
-        local item = {player = p}
-        
-        if nameEspEnabled then
-            local txt = Drawing.new("Text")
-            txt.Visible = true; txt.Color = nameEspColor; txt.Size = 14; txt.Center = true; txt.Outline = true; txt.OutlineColor = Color3.new(0,0,0)
-            item.name = txt
+        if p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                pcall(function()
+                    local origSize = hrp:GetAttribute("origSize")
+                    local origTransparency = hrp:GetAttribute("origTransparency")
+                    local origColor = hrp:GetAttribute("origColor")
+                    local origMaterial = hrp:GetAttribute("origMaterial")
+                    if origSize then hrp.Size = origSize else hrp.Size = Vector3.new(2, 2, 1) end
+                    if origTransparency ~= nil then hrp.Transparency = origTransparency else hrp.Transparency = 1 end
+                    if origColor then hrp.Color = origColor else hrp.Color = Color3.new(1, 1, 1) end
+                    if origMaterial then hrp.Material = origMaterial else hrp.Material = Enum.Material.Plastic end
+                    hrp:SetAttribute("origSize", nil)
+                    hrp:SetAttribute("origTransparency", nil)
+                    hrp:SetAttribute("origColor", nil)
+                    hrp:SetAttribute("origMaterial", nil)
+                end)
+            end
         end
-        
-        if boxEspEnabled then
-            local box = Drawing.new("Square")
-            box.Visible = true; box.Color = boxEspColor; box.Thickness = 1; box.Filled = false
-            item.box = box
-        end
-        
-        if healthBarEnabled then
-            local hpBg = Drawing.new("Line")
-            hpBg.Visible = true; hpBg.Color = Color3.new(0.15,0.15,0.15); hpBg.Thickness = 3
-            item.hpBg = hpBg
-            local hpBar = Drawing.new("Line")
-            hpBar.Visible = true; hpBar.Color = Color3.new(0,1,0); hpBar.Thickness = 1
-            item.hpBar = hpBar
-        end
-        
-        table.insert(espList, item)
     end
 end
-local function espRender()
-    local myPos = Camera.CFrame.Position
-    for _, item in ipairs(espList) do
-        pcall(function()
-            local p = item.player
-            if p == LocalPlayer then
-                if item.name then item.name.Visible = false end
-                if item.box then item.box.Visible = false end
-                if item.hpBg then item.hpBg.Visible = false; item.hpBar.Visible = false end
-                return
-            end
-            local char = p.Character
-            if not char then
-                if item.name then item.name.Visible = false end
-                if item.box then item.box.Visible = false end
-                if item.hpBg then item.hpBg.Visible = false; item.hpBar.Visible = false end
-                return
-            end
-            local head = char:FindFirstChild("Head")
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if not head or not hrp or not hum then
-                if item.name then item.name.Visible = false end
-                if item.box then item.box.Visible = false end
-                if item.hpBg then item.hpBg.Visible = false; item.hpBar.Visible = false end
-                return
-            end
-            local topPoint = head.Position + Vector3.new(0, 1.5, 0)
-            local bottomPoint = hrp.Position - Vector3.new(0, 3.5, 0)
-            local topPos, topOnScreen = Camera:WorldToViewportPoint(topPoint)
-            local bottomPos = Camera:WorldToViewportPoint(bottomPoint)
-            if not topOnScreen then
-                if item.name then item.name.Visible = false end
-                if item.box then item.box.Visible = false end
-                if item.hpBg then item.hpBg.Visible = false; item.hpBar.Visible = false end
-                return
-            end
-            local dist = math.floor((myPos - head.Position).Magnitude)
-            if dist > 1000 then
-                if item.name then item.name.Visible = false end
-                if item.box then item.box.Visible = false end
-                if item.hpBg then item.hpBg.Visible = false; item.hpBar.Visible = false end
-                return
-            end
-            local boxHeight = math.abs(topPos.Y - bottomPos.Y)
-            local boxWidth = boxHeight * 0.55
-            local boxLeft = topPos.X - boxWidth/2
-            local boxTop = topPos.Y
+
+local function enableHitbox()
+    if _G.hitboxEnabled then return end
+    _G.hitboxEnabled = true
+    if hitboxConn then hitboxConn:Disconnect() end
+    hitboxConn = addConnection(RunService.Heartbeat:Connect(function()
+        expandHitboxes()
+    end))
+    expandHitboxes()
+    print("✅ Hitbox включён, размер:", _G.hitboxSize)
+end
+
+local function disableHitbox()
+    if not _G.hitboxEnabled then return end
+    _G.hitboxEnabled = false
+    if hitboxConn then 
+        hitboxConn:Disconnect()
+        hitboxConn = nil
+    end
+    resetHitboxes()
+    print("✅ Hitbox выключен")
+end
+
+-- ============================================================
+-- ESP
+-- ============================================================
+local espObjects = {}
+local espConn = nil
+
+local function clearESP()
+    for _, obj in ipairs(espObjects) do
+        pcall(function() obj:Remove() end)
+    end
+    espObjects = {}
+end
+
+local function updateESP()
+    clearESP()
+    if not _G.espEnabled then return end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LocalPlayer or not p.Character then continue end
+        
+        local head = p.Character:FindFirstChild("Head")
+        local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+        local hum = p.Character:FindFirstChildOfClass("Humanoid")
+        
+        if not head or not hrp or not hum then continue end
+        
+        if _G.nameEspEnabled then
+            local txt = Drawing.new("Text")
+            txt.Visible = true
+            txt.Color = _G.nameEspColor
+            txt.Size = 14
+            txt.Center = true
+            txt.Outline = true
+            txt.OutlineColor = Color3.new(0, 0, 0)
+            txt.Text = p.DisplayName
+            table.insert(espObjects, txt)
+        end
+        
+        if _G.boxEspEnabled then
+            local box = Drawing.new("Square")
+            box.Visible = true
+            box.Color = _G.boxEspColor
+            box.Thickness = 1
+            box.Filled = false
+            table.insert(espObjects, box)
+        end
+        
+        if _G.healthBarEnabled then
+            local hpBg = Drawing.new("Line")
+            hpBg.Visible = true
+            hpBg.Color = Color3.new(0.15, 0.15, 0.15)
+            hpBg.Thickness = 3
+            table.insert(espObjects, hpBg)
             
-            if item.name then
-                item.name.Visible = true; item.name.Color = nameEspColor
-                item.name.Text = p.DisplayName .. " [" .. dist .. "m]"; item.name.Position = Vector2.new(topPos.X, topPos.Y - 20)
+            local hpBar = Drawing.new("Line")
+            hpBar.Visible = true
+            hpBar.Color = Color3.new(0, 1, 0)
+            hpBar.Thickness = 1
+            table.insert(espObjects, hpBar)
+            
+            local hpText = Drawing.new("Text")
+            hpText.Visible = true
+            hpText.Color = Color3.new(1, 1, 1)
+            hpText.Size = 10
+            hpText.Center = true
+            hpText.Outline = true
+            hpText.OutlineColor = Color3.new(0, 0, 0)
+            table.insert(espObjects, hpText)
+        end
+    end
+end
+
+local function renderESP()
+    if not _G.espEnabled then return end
+    
+    local myPos = Camera.CFrame.Position
+    local idx = 1
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LocalPlayer or not p.Character then continue end
+        
+        local head = p.Character:FindFirstChild("Head")
+        local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+        local hum = p.Character:FindFirstChildOfClass("Humanoid")
+        
+        if not head or not hrp or not hum then continue end
+        
+        local tp = head.Position + Vector3.new(0, 1.5, 0)
+        local bp = hrp.Position - Vector3.new(0, 3.5, 0)
+        local tp2, onScreen = Camera:WorldToViewportPoint(tp)
+        local bp2 = Camera:WorldToViewportPoint(bp)
+        
+        if not onScreen then
+            idx = idx + 3
+            continue
+        end
+        
+        local dist = math.floor((myPos - head.Position).Magnitude)
+        if dist > 1000 then
+            idx = idx + 3
+            continue
+        end
+        
+        local bh = math.abs(tp2.Y - bp2.Y)
+        local bw = bh * 0.55
+        local bl = tp2.X - bw / 2
+        local bt = tp2.Y
+        
+        if _G.nameEspEnabled then
+            local txt = espObjects[idx]
+            if txt then
+                txt.Visible = true
+                txt.Color = _G.nameEspColor
+                txt.Text = p.DisplayName .. " [" .. dist .. "m]"
+                txt.Position = Vector2.new(tp2.X, tp2.Y - 20)
+                idx = idx + 1
             end
-            if item.box then
-                item.box.Visible = true; item.box.Color = boxEspColor
-                item.box.Position = Vector2.new(boxLeft, boxTop); item.box.Size = Vector2.new(boxWidth, boxHeight)
+        end
+        
+        if _G.boxEspEnabled then
+            local box = espObjects[idx]
+            if box then
+                box.Visible = true
+                box.Color = _G.boxEspColor
+                box.Position = Vector2.new(bl, bt)
+                box.Size = Vector2.new(bw, bh)
+                idx = idx + 1
             end
-            if item.hpBar and item.hpBg then
-                local hpPct = hum.Health / hum.MaxHealth; local barX = boxLeft - 6; local barTopY = boxTop; local barBottomY = boxTop + boxHeight
-                item.hpBg.Visible = true; item.hpBg.From = Vector2.new(barX, barTopY); item.hpBg.To = Vector2.new(barX, barBottomY)
-                local healthY = barTopY + (barBottomY - barTopY) * (1 - hpPct)
-                item.hpBar.Visible = true; item.hpBar.From = Vector2.new(barX, healthY); item.hpBar.To = Vector2.new(barX, barBottomY)
-                item.hpBar.Color = hpPct > 0.5 and Color3.new(0,1,0) or (hpPct > 0.25 and Color3.new(1,1,0) or Color3.new(1,0,0))
+        end
+        
+        if _G.healthBarEnabled then
+            local hpPct = hum.Health / hum.MaxHealth
+            local barX = bl - 6
+            local barTY = bt
+            local barBY = bt + bh
+            
+            local hpBg = espObjects[idx]
+            if hpBg then
+                hpBg.Visible = true
+                hpBg.From = Vector2.new(barX, barTY)
+                hpBg.To = Vector2.new(barX, barBY)
+                idx = idx + 1
+            end
+            
+            local healthY = barTY + (barBY - barTY) * (1 - hpPct)
+            local hpBar = espObjects[idx]
+            if hpBar then
+                hpBar.Visible = true
+                hpBar.From = Vector2.new(barX, healthY)
+                hpBar.To = Vector2.new(barX, barBY)
+                if hpPct > 0.5 then
+                    hpBar.Color = Color3.new(0, 1, 0)
+                elseif hpPct > 0.25 then
+                    hpBar.Color = Color3.new(1, 1, 0)
+                else
+                    hpBar.Color = Color3.new(1, 0, 0)
+                end
+                idx = idx + 1
+            end
+            
+            local hpText = espObjects[idx]
+            if hpText then
+                hpText.Visible = true
+                hpText.Text = math.floor(hpPct * 100) .. "%"
+                hpText.Position = Vector2.new(barX - 2, barTY + bh / 2)
+                hpText.Color = hpPct > 0.5 and Color3.new(0, 1, 0) or (hpPct > 0.25 and Color3.new(1, 1, 0) or Color3.new(1, 0, 0))
+                idx = idx + 1
+            end
+        end
+    end
+    
+    for i = idx, #espObjects do
+        local obj = espObjects[i]
+        if obj then obj.Visible = false end
+    end
+end
+
+local function enableESP()
+    _G.espEnabled = true
+    if espConn then espConn:Disconnect() end
+    updateESP()
+    espConn = addConnection(RunService.RenderStepped:Connect(function()
+        updateESP()
+        renderESP()
+    end))
+end
+
+local function disableESP()
+    _G.espEnabled = false
+    if espConn then espConn:Disconnect(); espConn = nil end
+    clearESP()
+end
+
+-- ============================================================
+-- CHAMS
+-- ============================================================
+local function clearChams()
+    if pulseThread then pcall(function() pulseThread:Disconnect() end); pulseThread = nil end
+    for _, d in ipairs(chamObjects) do
+        pcall(function()
+            if d.highlight then d.highlight:Destroy() end
+            if d.highlight2 then d.highlight2:Destroy() end
+            if d.parts then
+                for _, p in ipairs(d.parts) do
+                    pcall(function()
+                        p.Transparency = d.origTransparency or 0
+                        p.Color = d.origColor or Color3.new(1, 1, 1)
+                        p.Material = d.origMaterial or Enum.Material.Plastic
+                        p.Reflectance = d.origReflectance or 0
+                    end)
+                end
             end
         end)
     end
-end
-local function enableESP() espEnabled=true; if espConn then espConn:Disconnect() end; espLoop(); espConn=RunService.RenderStepped:Connect(function() espLoop(); espRender() end) end
-local function disableESP() espEnabled=false; if espConn then espConn:Disconnect(); espConn=nil end; for _, item in ipairs(espList) do pcall(function() item.name:Remove() end); pcall(function() item.box:Remove() end); pcall(function() item.hpBg:Remove() end); pcall(function() item.hpBar:Remove() end) end; espList={} end
-
--- FULLBRIGHT
-local function enableFullbright() fullbrightEnabled=true; if fullbrightConn then fullbrightConn:Disconnect() end; fullbrightConn=RunService.Heartbeat:Connect(function() pcall(function() Lighting.Brightness=3; Lighting.ClockTime=12; Lighting.FogEnd=999999; Lighting.GlobalShadows=false end) end) end
-local function disableFullbright() fullbrightEnabled=false; if fullbrightConn then fullbrightConn:Disconnect(); fullbrightConn=nil end; pcall(function() Lighting.Brightness=1; Lighting.FogEnd=1000; Lighting.GlobalShadows=true end) end
-
--- SPEEDHACK
-local function enableSpeed() speedEnabled=true; if speedConn then speedConn:Disconnect() end; speedConn=RunService.Heartbeat:Connect(function() pcall(function() local char=LocalPlayer.Character; if char then local hum=char:FindFirstChildOfClass("Humanoid"); if hum then if hum.MoveDirection.Magnitude>0 then hum.WalkSpeed=speedValue else hum.WalkSpeed=16 end end end end) end) end
-local function disableSpeed() speedEnabled=false; if speedConn then speedConn:Disconnect(); speedConn=nil end; pcall(function() local char=LocalPlayer.Character; if char then local hum=char:FindFirstChildOfClass("Humanoid"); if hum then hum.WalkSpeed=16 end end end) end
-
--- FOV
-local function enableFOV() fovEnabled=true; if fovConn then fovConn:Disconnect() end; pcall(function() Camera.FieldOfView=fovValue end); fovConn=Camera:GetPropertyChangedSignal("FieldOfView"):Connect(function() if fovEnabled then pcall(function() Camera.FieldOfView=fovValue end) end end) end
-local function disableFOV() fovEnabled=false; if fovConn then fovConn:Disconnect(); fovConn=nil end; pcall(function() Camera.FieldOfView=70 end) end
-
--- GUI
-task.wait(0.5)
-local pg = LocalPlayer:WaitForChild("PlayerGui")
-for _, v in ipairs(pg:GetChildren()) do if v.Name == "zimon4ik" then v:Destroy() end end
-
-local gui = Instance.new("ScreenGui"); gui.Name = "zimon4ik"; gui.Parent = pg; gui.ResetOnSpawn = false; gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-
-local bg = Instance.new("Frame"); bg.Size = UDim2.new(0, 420, 0, 440); bg.Position = UDim2.new(0.5, -210, 0.5, -220)
-bg.BackgroundColor3 = Color3.fromRGB(10,10,10); bg.BorderColor3 = Color3.fromRGB(255,0,0); bg.BorderSizePixel = 2
-bg.Active = true; bg.Draggable = true; bg.Parent = gui
-Instance.new("UICorner", bg).CornerRadius = UDim.new(0,12)
-
-local hdr = Instance.new("Frame"); hdr.Size = UDim2.new(1,0,0,42); hdr.BackgroundColor3 = Color3.fromRGB(20,20,20); hdr.BorderSizePixel = 0; hdr.Parent = bg
-Instance.new("UICorner", hdr).CornerRadius = UDim.new(0,12)
-Instance.new("UIGradient", hdr).Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255,80,0))})
-
-local logo = Instance.new("Frame"); logo.Size = UDim2.new(0,28,0,28); logo.Position = UDim2.new(0,12,0,7); logo.BackgroundColor3 = Color3.fromRGB(255,0,0); logo.BorderSizePixel = 0; logo.Parent = hdr
-Instance.new("UICorner", logo).CornerRadius = UDim.new(0,7)
-local lt = Instance.new("TextLabel"); lt.Size = UDim2.new(1,0,1,0); lt.BackgroundTransparency = 1; lt.Text = "Z"; lt.TextColor3 = Color3.new(1,1,1); lt.Font = Enum.Font.SourceSansBold; lt.TextSize = 18; lt.Parent = logo
-
-local tt = Instance.new("TextLabel"); tt.Size = UDim2.new(0,200,0,22); tt.Position = UDim2.new(0,48,0,10); tt.BackgroundTransparency = 1; tt.Text = "zimon4ik.hook v1.1"; tt.TextColor3 = Color3.new(1,1,1); tt.Font = Enum.Font.SourceSansBold; tt.TextSize = 16; tt.TextXAlignment = Enum.TextXAlignment.Left; tt.Parent = hdr
-
-local keyArea = Instance.new("Frame"); keyArea.Size = UDim2.new(0,50,0,30); keyArea.Position = UDim2.new(1,-56,0,6); keyArea.BackgroundTransparency = 1; keyArea.Parent = hdr
-local keyLabel = Instance.new("TextLabel"); keyLabel.Size = UDim2.new(1,0,0,10); keyLabel.Position = UDim2.new(0,0,0,0); keyLabel.BackgroundTransparency = 1; keyLabel.Text = "toggle"; keyLabel.TextColor3 = Color3.new(0.4,0.4,0.4); keyLabel.Font = Enum.Font.Code; keyLabel.TextSize = 8; keyLabel.TextXAlignment = Enum.TextXAlignment.Center; keyLabel.Parent = keyArea
-local keyBtn = Instance.new("TextButton"); keyBtn.Size = UDim2.new(0,30,0,18); keyBtn.Position = UDim2.new(0,10,0,12); keyBtn.BackgroundColor3 = Color3.fromRGB(40,40,40); keyBtn.BorderColor3 = Color3.fromRGB(100,100,100); keyBtn.BorderSizePixel = 1; keyBtn.Text = "V"; keyBtn.TextColor3 = Color3.new(0.8,0.8,0.8); keyBtn.Font = Enum.Font.Code; keyBtn.TextSize = 11; keyBtn.ZIndex = 999; keyBtn.Parent = keyArea
-Instance.new("UICorner", keyBtn).CornerRadius = UDim.new(0,3)
-
--- Табы
-local function makeTab(text, x)
-    local tab = Instance.new("TextButton"); tab.Size = UDim2.new(0,72,0,24); tab.Position = UDim2.new(0,x,0,48)
-    tab.BackgroundColor3 = Color3.fromRGB(40,40,40); tab.BorderSizePixel = 0; tab.Text = text; tab.TextColor3 = Color3.new(0.8,0.8,0.8); tab.Font = Enum.Font.SourceSansBold; tab.TextSize = 10; tab.Parent = bg
-    Instance.new("UICorner", tab).CornerRadius = UDim.new(0,5)
-    return tab
+    chamObjects = {}
 end
 
-local tab1 = makeTab("HITBOX", 12)
-local tab2 = makeTab("ESP", 92)
-local tab3 = makeTab("BRIGHT", 172)
-local tab4 = makeTab("SPEED", 252)
-local tab5 = makeTab("FOV", 332)
-tab1.BackgroundColor3 = Color3.fromRGB(200,0,0); tab1.TextColor3 = Color3.new(1,1,1)
-
-local function ml(parent, text, y)
-    local l = Instance.new("TextLabel"); l.Size = UDim2.new(1,-16,0,14); l.Position = UDim2.new(0,8,0,y); l.BackgroundTransparency = 1
-    l.Text = text; l.TextColor3 = Color3.new(0.6,0.6,0.6); l.Font = Enum.Font.Code; l.TextSize = 10; l.TextXAlignment = Enum.TextXAlignment.Left; l.Parent = parent
+local function applyChams()
+    clearChams()
+    if not _G.chamsEnabled then return end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LocalPlayer or not plr.Character then continue end
+        local char = plr.Character
+        local d = { player = plr, parts = {} }
+        if _G.chamsMode == "Glow" then
+            for _, p in ipairs(char:GetDescendants()) do
+                if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" and p.Name ~= "Torso" then
+                    table.insert(d.parts, p)
+                    d.origTransparency = p.Transparency
+                    d.origColor = p.Color
+                    d.origMaterial = p.Material
+                    d.origReflectance = p.Reflectance
+                    p.Transparency = 0.1
+                    p.Color = _G.chamsColor
+                    p.Material = Enum.Material.Neon
+                    p.Reflectance = 0.3
+                end
+            end
+            local h = Instance.new("Highlight")
+            h.FillColor = _G.chamsColor
+            h.FillTransparency = 0.05
+            h.OutlineColor = _G.chamsColor
+            h.OutlineTransparency = 0
+            h.Adornee = char
+            h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            h.Parent = char
+            d.highlight = h
+            local h2 = Instance.new("Highlight")
+            h2.FillColor = _G.chamsColor
+            h2.FillTransparency = 0.2
+            h2.OutlineColor = _G.chamsColor
+            h2.OutlineTransparency = 0.1
+            h2.Adornee = char
+            h2.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            h2.Parent = char
+            d.highlight2 = h2
+        elseif _G.chamsMode == "Wireframe" then
+            for _, p in ipairs(char:GetDescendants()) do
+                if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" and p.Name ~= "Torso" then
+                    table.insert(d.parts, p)
+                    d.origTransparency = p.Transparency
+                    d.origColor = p.Color
+                    d.origMaterial = p.Material
+                    p.Transparency = 0.3
+                    p.Color = _G.chamsColor
+                    p.Material = Enum.Material.Neon
+                end
+            end
+            local h = Instance.new("Highlight")
+            h.FillColor = _G.chamsColor
+            h.FillTransparency = 0.3
+            h.OutlineColor = _G.chamsColor
+            h.OutlineTransparency = 0
+            h.Adornee = char
+            h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            h.Parent = char
+            d.highlight = h
+        elseif _G.chamsMode == "Pulse" then
+            for _, p in ipairs(char:GetDescendants()) do
+                if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" and p.Name ~= "Torso" then
+                    table.insert(d.parts, p)
+                    d.origTransparency = p.Transparency
+                    d.origColor = p.Color
+                    d.origMaterial = p.Material
+                    d.origReflectance = p.Reflectance
+                    p.Color = _G.chamsColor
+                    p.Material = Enum.Material.Neon
+                    p.Reflectance = 0.2
+                end
+            end
+            local h = Instance.new("Highlight")
+            h.FillColor = _G.chamsColor
+            h.FillTransparency = 0.1
+            h.OutlineColor = _G.chamsColor
+            h.OutlineTransparency = 0
+            h.Adornee = char
+            h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            h.Parent = char
+            d.highlight = h
+            local h2 = Instance.new("Highlight")
+            h2.FillColor = _G.chamsColor
+            h2.FillTransparency = 0.3
+            h2.OutlineColor = _G.chamsColor
+            h2.OutlineTransparency = 0.1
+            h2.Adornee = char
+            h2.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            h2.Parent = char
+            d.highlight2 = h2
+            if not pulseThread then
+                pulseThread = addConnection(RunService.Heartbeat:Connect(function()
+                    if not _G.chamsEnabled or _G.chamsMode ~= "Pulse" then return end
+                    local pulse = 0.05 + math.sin(tick() * 4) * 0.2
+                    local pulse2 = 0.15 + math.sin(tick() * 4 + 1) * 0.2
+                    for _, obj in ipairs(chamObjects) do
+                        if obj.parts then
+                            for _, p in ipairs(obj.parts) do
+                                pcall(function() p.Transparency = pulse end)
+                            end
+                        end
+                        if obj.highlight and obj.highlight.Parent then
+                            pcall(function() obj.highlight.FillTransparency = pulse2 end)
+                        end
+                        if obj.highlight2 and obj.highlight2.Parent then
+                            pcall(function() obj.highlight2.FillTransparency = pulse2 + 0.15 end)
+                        end
+                    end
+                end))
+            end
+        end
+        table.insert(chamObjects, d)
+    end
+    print("✅ Chams: " .. _G.chamsMode)
 end
 
--- HITBOX PAGE
-local hp = Instance.new("Frame"); hp.Size = UDim2.new(1,-24,0,310); hp.Position = UDim2.new(0,12,0,78); hp.BackgroundTransparency = 1; hp.Visible = true; hp.Parent = bg
-local hBtn = Instance.new("TextButton"); hBtn.Size = UDim2.new(1,0,0,40); hBtn.BackgroundColor3 = Color3.fromRGB(200,0,0); hBtn.BorderSizePixel = 0; hBtn.Text = "ENABLE HITBOX EXPANDER"; hBtn.TextColor3 = Color3.new(1,1,1); hBtn.Font = Enum.Font.SourceSansBold; hBtn.TextSize = 16; hBtn.Parent = hp
-Instance.new("UICorner", hBtn).CornerRadius = UDim.new(0,7)
-local hSt = Instance.new("TextLabel"); hSt.Size = UDim2.new(1,0,0,15); hSt.Position = UDim2.new(0,0,0,44); hSt.BackgroundTransparency = 1; hSt.Text = "STATUS: OFF"; hSt.TextColor3 = Color3.fromRGB(255,0,0); hSt.Font = Enum.Font.SourceSansBold; hSt.TextSize = 12; hSt.TextXAlignment = Enum.TextXAlignment.Left; hSt.Parent = hp
-local hSet = Instance.new("Frame"); hSet.Size = UDim2.new(1,0,0,120); hSet.Position = UDim2.new(0,0,0,63); hSet.BackgroundColor3 = Color3.fromRGB(18,18,18); hSet.BorderSizePixel = 0; hSet.Parent = hp
-Instance.new("UICorner", hSet).CornerRadius = UDim.new(0,7)
-ml(hSet, "SIZE", 6)
-local sZ = Instance.new("TextBox"); sZ.Size = UDim2.new(1,-16,0,32); sZ.Position = UDim2.new(0,8,0,20); sZ.BackgroundColor3 = Color3.fromRGB(25,25,25); sZ.BorderColor3 = Color3.new(0.3,0.3,0.3); sZ.Text = "10"; sZ.TextColor3 = Color3.new(1,1,1); sZ.Font = Enum.Font.SourceSansBold; sZ.TextSize = 17; sZ.Parent = hSet
-Instance.new("UICorner", sZ).CornerRadius = UDim.new(0,5)
-ml(hSet, "COLOR (R,G,B)", 56)
-local rB = Instance.new("TextBox"); rB.Size = UDim2.new(0,105,0,28); rB.Position = UDim2.new(0,8,0,72); rB.BackgroundColor3 = Color3.fromRGB(40,8,8); rB.BorderColor3 = Color3.new(0.4,0.12,0.12); rB.Text = "255"; rB.TextColor3 = Color3.new(1,0.5,0.5); rB.Font = Enum.Font.SourceSansBold; rB.TextSize = 14; rB.Parent = hSet
-Instance.new("UICorner", rB).CornerRadius = UDim.new(0,4)
-local gB = Instance.new("TextBox"); gB.Size = UDim2.new(0,105,0,28); gB.Position = UDim2.new(0,123,0,72); gB.BackgroundColor3 = Color3.fromRGB(8,40,8); gB.BorderColor3 = Color3.new(0.12,0.4,0.12); gB.Text = "255"; gB.TextColor3 = Color3.new(0.5,1,0.5); gB.Font = Enum.Font.SourceSansBold; gB.TextSize = 14; gB.Parent = hSet
-Instance.new("UICorner", gB).CornerRadius = UDim.new(0,4)
-local bB = Instance.new("TextBox"); bB.Size = UDim2.new(0,105,0,28); bB.Position = UDim2.new(0,238,0,72); bB.BackgroundColor3 = Color3.fromRGB(8,8,40); bB.BorderColor3 = Color3.new(0.12,0.12,0.4); bB.Text = "255"; bB.TextColor3 = Color3.new(0.5,0.5,1); bB.Font = Enum.Font.SourceSansBold; bB.TextSize = 14; bB.Parent = hSet
-Instance.new("UICorner", bB).CornerRadius = UDim.new(0,4)
-
--- ESP PAGE
-local ep = Instance.new("Frame"); ep.Size = UDim2.new(1,-24,0,310); ep.Position = UDim2.new(0,12,0,78); ep.BackgroundTransparency = 1; ep.Visible = false; ep.Parent = bg
-local eBtn = Instance.new("TextButton"); eBtn.Size = UDim2.new(1,0,0,40); eBtn.BackgroundColor3 = Color3.fromRGB(200,0,0); eBtn.BorderSizePixel = 0; eBtn.Text = "ENABLE ESP"; eBtn.TextColor3 = Color3.new(1,1,1); eBtn.Font = Enum.Font.SourceSansBold; eBtn.TextSize = 16; eBtn.Parent = ep
-Instance.new("UICorner", eBtn).CornerRadius = UDim.new(0,7)
-local eSt = Instance.new("TextLabel"); eSt.Size = UDim2.new(1,0,0,15); eSt.Position = UDim2.new(0,0,0,44); eSt.BackgroundTransparency = 1; eSt.Text = "STATUS: OFF"; eSt.TextColor3 = Color3.fromRGB(255,0,0); eSt.Font = Enum.Font.SourceSansBold; eSt.TextSize = 12; eSt.TextXAlignment = Enum.TextXAlignment.Left; eSt.Parent = ep
-
--- NAME ESP + COLOR
-local eSet1 = Instance.new("Frame"); eSet1.Size = UDim2.new(1,0,0,80); eSet1.Position = UDim2.new(0,0,0,63); eSet1.BackgroundColor3 = Color3.fromRGB(18,18,18); eSet1.BorderSizePixel = 0; eSet1.Parent = ep
-Instance.new("UICorner", eSet1).CornerRadius = UDim.new(0,7)
-local nameToggle = Instance.new("TextButton"); nameToggle.Size = UDim2.new(1,-16,0,28); nameToggle.Position = UDim2.new(0,8,0,6); nameToggle.BackgroundColor3 = Color3.fromRGB(0,170,0); nameToggle.BorderSizePixel = 0; nameToggle.Text = "NAME ESP: ON"; nameToggle.TextColor3 = Color3.new(1,1,1); nameToggle.Font = Enum.Font.SourceSansBold; nameToggle.TextSize = 13; nameToggle.Parent = eSet1
-Instance.new("UICorner", nameToggle).CornerRadius = UDim.new(0,5)
-nameToggle.MouseButton1Down:Connect(function() nameEspEnabled=not nameEspEnabled; nameToggle.Text = nameEspEnabled and "NAME ESP: ON" or "NAME ESP: OFF"; nameToggle.BackgroundColor3 = nameEspEnabled and Color3.fromRGB(0,170,0) or Color3.fromRGB(80,80,80); if espEnabled then espLoop() end end)
-
-ml(eSet1, "NAME COLOR (R,G,B)", 38)
-local nrB = Instance.new("TextBox"); nrB.Size = UDim2.new(0,105,0,26); nrB.Position = UDim2.new(0,8,0,52); nrB.BackgroundColor3 = Color3.fromRGB(40,8,8); nrB.BorderColor3 = Color3.new(0.4,0.12,0.12); nrB.Text = "255"; nrB.TextColor3 = Color3.new(1,0.5,0.5); nrB.Font = Enum.Font.SourceSansBold; nrB.TextSize = 13; nrB.Parent = eSet1
-Instance.new("UICorner", nrB).CornerRadius = UDim.new(0,3)
-local ngB = Instance.new("TextBox"); ngB.Size = UDim2.new(0,105,0,26); ngB.Position = UDim2.new(0,123,0,52); ngB.BackgroundColor3 = Color3.fromRGB(8,40,8); ngB.BorderColor3 = Color3.new(0.12,0.4,0.12); ngB.Text = "255"; ngB.TextColor3 = Color3.new(0.5,1,0.5); ngB.Font = Enum.Font.SourceSansBold; ngB.TextSize = 13; ngB.Parent = eSet1
-Instance.new("UICorner", ngB).CornerRadius = UDim.new(0,3)
-local nbB = Instance.new("TextBox"); nbB.Size = UDim2.new(0,105,0,26); nbB.Position = UDim2.new(0,238,0,52); nbB.BackgroundColor3 = Color3.fromRGB(8,8,40); nbB.BorderColor3 = Color3.new(0.12,0.12,0.4); nbB.Text = "255"; nbB.TextColor3 = Color3.new(0.5,0.5,1); nbB.Font = Enum.Font.SourceSansBold; nbB.TextSize = 13; nbB.Parent = eSet1
-Instance.new("UICorner", nbB).CornerRadius = UDim.new(0,3)
-
-local function updateNameColor()
-    local r = math.clamp(tonumber(nrB.Text) or 255, 0, 255)
-    local g = math.clamp(tonumber(ngB.Text) or 255, 0, 255)
-    local b = math.clamp(tonumber(nbB.Text) or 255, 0, 255)
-    nameEspColor = Color3.fromRGB(r, g, b)
-    if espEnabled then espLoop() end
+local function enableChams()
+    if _G.chamsEnabled then return end
+    _G.chamsEnabled = true
+    applyChams()
+    if chamConn then chamConn:Disconnect() end
+    chamConn = addConnection(Players.PlayerAdded:Connect(function()
+        task.wait(1)
+        if _G.chamsEnabled then applyChams() end
+    end))
+    print("✅ Chams включены")
 end
-nrB:GetPropertyChangedSignal("Text"):Connect(updateNameColor)
-ngB:GetPropertyChangedSignal("Text"):Connect(updateNameColor)
-nbB:GetPropertyChangedSignal("Text"):Connect(updateNameColor)
 
--- BOX ESP + COLOR
-local eSet2 = Instance.new("Frame"); eSet2.Size = UDim2.new(1,0,0,80); eSet2.Position = UDim2.new(0,0,0,148); eSet2.BackgroundColor3 = Color3.fromRGB(18,18,18); eSet2.BorderSizePixel = 0; eSet2.Parent = ep
-Instance.new("UICorner", eSet2).CornerRadius = UDim.new(0,7)
-local boxToggle = Instance.new("TextButton"); boxToggle.Size = UDim2.new(1,-16,0,28); boxToggle.Position = UDim2.new(0,8,0,6); boxToggle.BackgroundColor3 = Color3.fromRGB(80,80,80); boxToggle.BorderSizePixel = 0; boxToggle.Text = "BOX ESP: OFF"; boxToggle.TextColor3 = Color3.new(1,1,1); boxToggle.Font = Enum.Font.SourceSansBold; boxToggle.TextSize = 13; boxToggle.Parent = eSet2
-Instance.new("UICorner", boxToggle).CornerRadius = UDim.new(0,5)
-boxToggle.MouseButton1Down:Connect(function() boxEspEnabled=not boxEspEnabled; boxToggle.Text = boxEspEnabled and "BOX ESP: ON" or "BOX ESP: OFF"; boxToggle.BackgroundColor3 = boxEspEnabled and Color3.fromRGB(0,170,0) or Color3.fromRGB(80,80,80); if espEnabled then espLoop() end end)
-ml(eSet2, "BOX COLOR (R,G,B)", 38)
-local brB = Instance.new("TextBox"); brB.Size = UDim2.new(0,105,0,26); brB.Position = UDim2.new(0,8,0,52); brB.BackgroundColor3 = Color3.fromRGB(40,8,8); brB.BorderColor3 = Color3.new(0.4,0.12,0.12); brB.Text = "255"; brB.TextColor3 = Color3.new(1,0.5,0.5); brB.Font = Enum.Font.SourceSansBold; brB.TextSize = 13; brB.Parent = eSet2
-Instance.new("UICorner", brB).CornerRadius = UDim.new(0,3)
-local bgB = Instance.new("TextBox"); bgB.Size = UDim2.new(0,105,0,26); bgB.Position = UDim2.new(0,123,0,52); bgB.BackgroundColor3 = Color3.fromRGB(8,40,8); bgB.BorderColor3 = Color3.new(0.12,0.4,0.12); bgB.Text = "255"; bgB.TextColor3 = Color3.new(0.5,1,0.5); bgB.Font = Enum.Font.SourceSansBold; bgB.TextSize = 13; bgB.Parent = eSet2
-Instance.new("UICorner", bgB).CornerRadius = UDim.new(0,3)
-local bbB = Instance.new("TextBox"); bbB.Size = UDim2.new(0,105,0,26); bbB.Position = UDim2.new(0,238,0,52); bbB.BackgroundColor3 = Color3.fromRGB(8,8,40); bbB.BorderColor3 = Color3.new(0.12,0.12,0.4); bbB.Text = "255"; bbB.TextColor3 = Color3.new(0.5,0.5,1); bbB.Font = Enum.Font.SourceSansBold; bbB.TextSize = 13; bbB.Parent = eSet2
-Instance.new("UICorner", bbB).CornerRadius = UDim.new(0,3)
-
-local function updateBoxColor()
-    local r = math.clamp(tonumber(brB.Text) or 255, 0, 255)
-    local g = math.clamp(tonumber(bgB.Text) or 255, 0, 255)
-    local b = math.clamp(tonumber(bbB.Text) or 255, 0, 255)
-    boxEspColor = Color3.fromRGB(r, g, b)
-    if espEnabled then espLoop() end
+local function disableChams()
+    if not _G.chamsEnabled then return end
+    _G.chamsEnabled = false
+    if chamConn then chamConn:Disconnect(); chamConn = nil end
+    if pulseThread then pcall(function() pulseThread:Disconnect() end); pulseThread = nil end
+    clearChams()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character then
+            for _, v in ipairs(plr.Character:GetDescendants()) do
+                if v:IsA("Highlight") then pcall(function() v:Destroy() end) end
+                if v:IsA("BasePart") and v.Material == Enum.Material.Neon then
+                    pcall(function()
+                        v.Transparency = 0
+                        v.Material = Enum.Material.Plastic
+                        v.Reflectance = 0
+                    end)
+                end
+            end
+        end
+    end
+    print("✅ Chams выключены")
 end
-brB:GetPropertyChangedSignal("Text"):Connect(updateBoxColor)
-bgB:GetPropertyChangedSignal("Text"):Connect(updateBoxColor)
-bbB:GetPropertyChangedSignal("Text"):Connect(updateBoxColor)
 
--- HEALTH BAR
-local eSet3 = Instance.new("Frame"); eSet3.Size = UDim2.new(1,0,0,40); eSet3.Position = UDim2.new(0,0,0,233); eSet3.BackgroundColor3 = Color3.fromRGB(18,18,18); eSet3.BorderSizePixel = 0; eSet3.Parent = ep
-Instance.new("UICorner", eSet3).CornerRadius = UDim.new(0,7)
-local hpToggle = Instance.new("TextButton"); hpToggle.Size = UDim2.new(1,-16,0,28); hpToggle.Position = UDim2.new(0,8,0,6); hpToggle.BackgroundColor3 = Color3.fromRGB(0,170,0); hpToggle.BorderSizePixel = 0; hpToggle.Text = "HEALTH BAR: ON"; hpToggle.TextColor3 = Color3.new(1,1,1); hpToggle.Font = Enum.Font.SourceSansBold; hpToggle.TextSize = 13; hpToggle.Parent = eSet3
-Instance.new("UICorner", hpToggle).CornerRadius = UDim.new(0,5)
-hpToggle.MouseButton1Down:Connect(function() healthBarEnabled=not healthBarEnabled; hpToggle.Text = healthBarEnabled and "HEALTH BAR: ON" or "HEALTH BAR: OFF"; hpToggle.BackgroundColor3 = healthBarEnabled and Color3.fromRGB(0,170,0) or Color3.fromRGB(80,80,80); if espEnabled then espLoop() end end)
+-- ============================================================
+-- FULLBRIGHT, SPEED, FOV
+-- ============================================================
+local function enableFullbright()
+    _G.fullbrightEnabled = true
+    if fullbrightConn then fullbrightConn:Disconnect() end
+    fullbrightConn = addConnection(RunService.Heartbeat:Connect(function()
+        pcall(function()
+            Lighting.Brightness = 3
+            Lighting.ClockTime = 12
+            Lighting.GlobalShadows = false
+        end)
+    end))
+end
 
--- FULLBRIGHT PAGE
-local lb = Instance.new("Frame"); lb.Size = UDim2.new(1,-24,0,310); lb.Position = UDim2.new(0,12,0,78); lb.BackgroundTransparency = 1; lb.Visible = false; lb.Parent = bg
-local lBtn = Instance.new("TextButton"); lBtn.Size = UDim2.new(1,0,0,40); lBtn.BackgroundColor3 = Color3.fromRGB(200,0,0); lBtn.BorderSizePixel = 0; lBtn.Text = "ENABLE FULLBRIGHT"; lBtn.TextColor3 = Color3.new(1,1,1); lBtn.Font = Enum.Font.SourceSansBold; lBtn.TextSize = 16; lBtn.Parent = lb
-Instance.new("UICorner", lBtn).CornerRadius = UDim.new(0,7)
-local lSt = Instance.new("TextLabel"); lSt.Size = UDim2.new(1,0,0,15); lSt.Position = UDim2.new(0,0,0,44); lSt.BackgroundTransparency = 1; lSt.Text = "STATUS: OFF"; lSt.TextColor3 = Color3.fromRGB(255,0,0); lSt.Font = Enum.Font.SourceSansBold; lSt.TextSize = 12; lSt.TextXAlignment = Enum.TextXAlignment.Left; lSt.Parent = lb
+local function disableFullbright()
+    _G.fullbrightEnabled = false
+    if fullbrightConn then fullbrightConn:Disconnect(); fullbrightConn = nil end
+    pcall(function()
+        Lighting.Brightness = 1
+        Lighting.GlobalShadows = true
+    end)
+end
 
--- SPEED PAGE
-local sp = Instance.new("Frame"); sp.Size = UDim2.new(1,-24,0,310); sp.Position = UDim2.new(0,12,0,78); sp.BackgroundTransparency = 1; sp.Visible = false; sp.Parent = bg
-local sBtn = Instance.new("TextButton"); sBtn.Size = UDim2.new(1,0,0,40); sBtn.BackgroundColor3 = Color3.fromRGB(200,0,0); sBtn.BorderSizePixel = 0; sBtn.Text = "ENABLE SPEEDHACK"; sBtn.TextColor3 = Color3.new(1,1,1); sBtn.Font = Enum.Font.SourceSansBold; sBtn.TextSize = 16; sBtn.Parent = sp
-Instance.new("UICorner", sBtn).CornerRadius = UDim.new(0,7)
-local sSt = Instance.new("TextLabel"); sSt.Size = UDim2.new(1,0,0,15); sSt.Position = UDim2.new(0,0,0,44); sSt.BackgroundTransparency = 1; sSt.Text = "STATUS: OFF"; sSt.TextColor3 = Color3.fromRGB(255,0,0); sSt.Font = Enum.Font.SourceSansBold; sSt.TextSize = 12; sSt.TextXAlignment = Enum.TextXAlignment.Left; sSt.Parent = sp
-local sSet = Instance.new("Frame"); sSet.Size = UDim2.new(1,0,0,55); sSet.Position = UDim2.new(0,0,0,63); sSet.BackgroundColor3 = Color3.fromRGB(18,18,18); sSet.BorderSizePixel = 0; sSet.Parent = sp
-Instance.new("UICorner", sSet).CornerRadius = UDim.new(0,7)
-ml(sSet, "SPEED (MAX 40)", 6)
-local speedBox = Instance.new("TextBox"); speedBox.Size = UDim2.new(1,-16,0,28); speedBox.Position = UDim2.new(0,8,0,20); speedBox.BackgroundColor3 = Color3.fromRGB(25,25,25); speedBox.BorderColor3 = Color3.new(0.3,0.3,0.3); speedBox.Text = "30"; speedBox.TextColor3 = Color3.new(1,1,1); speedBox.Font = Enum.Font.SourceSansBold; speedBox.TextSize = 15; speedBox.Parent = sSet
-Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0,5)
+local function enableSpeed()
+    _G.speedEnabled = true
+    if speedConn then speedConn:Disconnect() end
+    speedConn = addConnection(RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.WalkSpeed = hum.MoveDirection.Magnitude > 0 and _G.speedValue or 16
+                end
+            end
+        end)
+    end))
+end
 
--- FOV PAGE
-local fp = Instance.new("Frame"); fp.Size = UDim2.new(1,-24,0,310); fp.Position = UDim2.new(0,12,0,78); fp.BackgroundTransparency = 1; fp.Visible = false; fp.Parent = bg
-local fBtn = Instance.new("TextButton"); fBtn.Size = UDim2.new(1,0,0,40); fBtn.BackgroundColor3 = Color3.fromRGB(200,0,0); fBtn.BorderSizePixel = 0; fBtn.Text = "ENABLE FOV CHANGER"; fBtn.TextColor3 = Color3.new(1,1,1); fBtn.Font = Enum.Font.SourceSansBold; fBtn.TextSize = 16; fBtn.Parent = fp
-Instance.new("UICorner", fBtn).CornerRadius = UDim.new(0,7)
-local fSt = Instance.new("TextLabel"); fSt.Size = UDim2.new(1,0,0,15); fSt.Position = UDim2.new(0,0,0,44); fSt.BackgroundTransparency = 1; fSt.Text = "STATUS: OFF"; fSt.TextColor3 = Color3.fromRGB(255,0,0); fSt.Font = Enum.Font.SourceSansBold; fSt.TextSize = 12; fSt.TextXAlignment = Enum.TextXAlignment.Left; fSt.Parent = fp
-local fSet = Instance.new("Frame"); fSet.Size = UDim2.new(1,0,0,55); fSet.Position = UDim2.new(0,0,0,63); fSet.BackgroundColor3 = Color3.fromRGB(18,18,18); fSet.BorderSizePixel = 0; fSet.Parent = fp
-Instance.new("UICorner", fSet).CornerRadius = UDim.new(0,7)
-ml(fSet, "FOV (MAX 120)", 6)
-local fovBox = Instance.new("TextBox"); fovBox.Size = UDim2.new(1,-16,0,28); fovBox.Position = UDim2.new(0,8,0,20); fovBox.BackgroundColor3 = Color3.fromRGB(25,25,25); fovBox.BorderColor3 = Color3.new(0.3,0.3,0.3); fovBox.Text = "90"; fovBox.TextColor3 = Color3.new(1,1,1); fovBox.Font = Enum.Font.SourceSansBold; fovBox.TextSize = 15; fovBox.Parent = fSet
-Instance.new("UICorner", fovBox).CornerRadius = UDim.new(0,5)
-
--- UNINJECT
-local un = Instance.new("TextButton"); un.Size = UDim2.new(0,110,0,24); un.Position = UDim2.new(0,12,1,-30); un.BackgroundColor3 = Color3.fromRGB(60,10,10); un.BorderColor3 = Color3.fromRGB(120,30,30); un.BorderSizePixel = 1; un.Text = "UNINJECT"; un.TextColor3 = Color3.fromRGB(255,120,120); un.Font = Enum.Font.SourceSansBold; un.TextSize = 12; un.Parent = bg
-Instance.new("UICorner", un).CornerRadius = UDim.new(0,5)
-
--- KEY
-local validKeys = {"A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12","LeftShift","RightShift","LeftControl","RightControl","LeftAlt","RightAlt","Insert","Delete","Home","End","PageUp","PageDown","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Zero"}
-local function setToggleKey(key) if Enum.KeyCode[key] then toggleKey = key; keyBtn.Text = key end end
-keyBtn.MouseButton1Down:Connect(function()
-    keyBtn.Text = "..."; keyBtn.BackgroundColor3 = Color3.fromRGB(200,100,0)
-    local conn; conn = UserInputService.InputBegan:Connect(function(input, processed)
-        if processed then return end
-        if input.UserInputType == Enum.UserInputType.Keyboard then
-            for _, v in ipairs(validKeys) do if input.KeyCode.Name == v then setToggleKey(v); keyBtn.BackgroundColor3 = Color3.fromRGB(40,40,40); conn:Disconnect(); break end end
+local function disableSpeed()
+    _G.speedEnabled = false
+    if speedConn then speedConn:Disconnect(); speedConn = nil end
+    pcall(function()
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = 16 end
         end
     end)
-    task.delay(5, function() if conn and conn.Connected then conn:Disconnect(); keyBtn.Text = toggleKey; keyBtn.BackgroundColor3 = Color3.fromRGB(40,40,40) end end)
-end)
-UserInputService.InputBegan:Connect(function(input, processed)
+end
+
+local function enableFOV()
+    if _G.fovEnabled then return end
+    _G.fovEnabled = true
+    if fovConn then fovConn:Disconnect() end
+    if fovLoopThread then pcall(function() fovLoopThread:Disconnect() end); fovLoopThread = nil end
+    pcall(function() Camera.FieldOfView = _G.fovValue end)
+    fovConn = addConnection(Camera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+        if _G.fovEnabled then pcall(function() Camera.FieldOfView = _G.fovValue end) end
+    end))
+    fovLoopThread = addConnection(RunService.Heartbeat:Connect(function()
+        if _G.fovEnabled then
+            pcall(function()
+                if Camera.FieldOfView ~= _G.fovValue then
+                    Camera.FieldOfView = _G.fovValue
+                end
+            end)
+        end
+    end))
+    print("✅ FOV включён:", _G.fovValue)
+end
+
+local function disableFOV()
+    if not _G.fovEnabled then return end
+    _G.fovEnabled = false
+    if fovConn then fovConn:Disconnect(); fovConn = nil end
+    if fovLoopThread then pcall(function() fovLoopThread:Disconnect() end); fovLoopThread = nil end
+    pcall(function() Camera.FieldOfView = 70 end)
+    print("✅ FOV выключен")
+end
+
+-- ============================================================
+-- FOG
+-- ============================================================
+local function applyFog()
+    if _G.fogEnabled then
+        pcall(function()
+            Lighting.Technology = Enum.Technology.Compatibility
+            Lighting.Fog = true
+            Lighting.FogColor = _G.fogColor
+            Lighting.FogStart = 0
+            Lighting.FogEnd = 1000
+        end)
+    else
+        pcall(function()
+            Lighting.Fog = false
+            Lighting.Technology = Enum.Technology.Future
+        end)
+    end
+end
+
+-- ============================================================
+-- AUTOJUMP
+-- ============================================================
+local function toggleAutojump()
+    _G.autojumpEnabled = not _G.autojumpEnabled
+    if _G.autojumpEnabled then
+        print("✅ AutoJump ВКЛЮЧЁН (C)")
+        if autojumpThread then pcall(function() autojumpThread:Disconnect() end); autojumpThread = nil end
+        autojumpThread = RunService.Heartbeat:Connect(function()
+            if not _G.autojumpEnabled then return end
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char then
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if hum and hum.PlatformStand == false then
+                        if hum.FloorMaterial ~= Enum.Material.Air then
+                            hum.Jump = true
+                        end
+                    end
+                end
+            end)
+        end)
+    else
+        print("❌ AutoJump ВЫКЛЮЧЁН")
+        if autojumpThread then pcall(function() autojumpThread:Disconnect() end); autojumpThread = nil end
+    end
+end
+
+addConnection(UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode.Name == toggleKey then guiVisible = not guiVisible; bg.Visible = guiVisible end
-end)
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        if input.KeyCode.Name == "C" then
+            toggleAutojump()
+        end
+    end
+end))
 
--- HANDLERS
-tab1.MouseButton1Down:Connect(function() hp.Visible=true; ep.Visible=false; lb.Visible=false; sp.Visible=false; fp.Visible=false; tab1.BackgroundColor3=Color3.fromRGB(200,0,0); tab1.TextColor3=Color3.new(1,1,1); tab2.BackgroundColor3=Color3.fromRGB(40,40,40); tab2.TextColor3=Color3.new(0.8,0.8,0.8); tab3.BackgroundColor3=Color3.fromRGB(40,40,40); tab3.TextColor3=Color3.new(0.8,0.8,0.8); tab4.BackgroundColor3=Color3.fromRGB(40,40,40); tab4.TextColor3=Color3.new(0.8,0.8,0.8); tab5.BackgroundColor3=Color3.fromRGB(40,40,40); tab5.TextColor3=Color3.new(0.8,0.8,0.8) end)
-tab2.MouseButton1Down:Connect(function() hp.Visible=false; ep.Visible=true; lb.Visible=false; sp.Visible=false; fp.Visible=false; tab2.BackgroundColor3=Color3.fromRGB(200,0,0); tab2.TextColor3=Color3.new(1,1,1); tab1.BackgroundColor3=Color3.fromRGB(40,40,40); tab1.TextColor3=Color3.new(0.8,0.8,0.8); tab3.BackgroundColor3=Color3.fromRGB(40,40,40); tab3.TextColor3=Color3.new(0.8,0.8,0.8); tab4.BackgroundColor3=Color3.fromRGB(40,40,40); tab4.TextColor3=Color3.new(0.8,0.8,0.8); tab5.BackgroundColor3=Color3.fromRGB(40,40,40); tab5.TextColor3=Color3.new(0.8,0.8,0.8) end)
-tab3.MouseButton1Down:Connect(function() hp.Visible=false; ep.Visible=false; lb.Visible=true; sp.Visible=false; fp.Visible=false; tab3.BackgroundColor3=Color3.fromRGB(200,0,0); tab3.TextColor3=Color3.new(1,1,1); tab1.BackgroundColor3=Color3.fromRGB(40,40,40); tab1.TextColor3=Color3.new(0.8,0.8,0.8); tab2.BackgroundColor3=Color3.fromRGB(40,40,40); tab2.TextColor3=Color3.new(0.8,0.8,0.8); tab4.BackgroundColor3=Color3.fromRGB(40,40,40); tab4.TextColor3=Color3.new(0.8,0.8,0.8); tab5.BackgroundColor3=Color3.fromRGB(40,40,40); tab5.TextColor3=Color3.new(0.8,0.8,0.8) end)
-tab4.MouseButton1Down:Connect(function() hp.Visible=false; ep.Visible=false; lb.Visible=false; sp.Visible=true; fp.Visible=false; tab4.BackgroundColor3=Color3.fromRGB(200,0,0); tab4.TextColor3=Color3.new(1,1,1); tab1.BackgroundColor3=Color3.fromRGB(40,40,40); tab1.TextColor3=Color3.new(0.8,0.8,0.8); tab2.BackgroundColor3=Color3.fromRGB(40,40,40); tab2.TextColor3=Color3.new(0.8,0.8,0.8); tab3.BackgroundColor3=Color3.fromRGB(40,40,40); tab3.TextColor3=Color3.new(0.8,0.8,0.8); tab5.BackgroundColor3=Color3.fromRGB(40,40,40); tab5.TextColor3=Color3.new(0.8,0.8,0.8) end)
-tab5.MouseButton1Down:Connect(function() hp.Visible=false; ep.Visible=false; lb.Visible=false; sp.Visible=false; fp.Visible=true; tab5.BackgroundColor3=Color3.fromRGB(200,0,0); tab5.TextColor3=Color3.new(1,1,1); tab1.BackgroundColor3=Color3.fromRGB(40,40,40); tab1.TextColor3=Color3.new(0.8,0.8,0.8); tab2.BackgroundColor3=Color3.fromRGB(40,40,40); tab2.TextColor3=Color3.new(0.8,0.8,0.8); tab3.BackgroundColor3=Color3.fromRGB(40,40,40); tab3.TextColor3=Color3.new(0.8,0.8,0.8); tab4.BackgroundColor3=Color3.fromRGB(40,40,40); tab4.TextColor3=Color3.new(0.8,0.8,0.8) end)
+-- ============================================================
+-- UNINJECT
+-- ============================================================
+local function idealUninject()
+    print("Выгрузка zimon4ik.hook v3.0...")
+    destroyBlur()
+    disableHitbox()
+    disableESP()
+    disableChams()
+    disableFullbright()
+    disableSpeed()
+    disableFOV()
+    _G.autojumpEnabled = false
+    if autojumpThread then pcall(function() autojumpThread:Disconnect() end); autojumpThread = nil end
+    _G.fogEnabled = false
+    pcall(function()
+        Lighting.Fog = false
+        Lighting.Technology = Enum.Technology.Future
+    end)
+    _G.chamsEnabled = false
+    if chamConn then pcall(function() chamConn:Disconnect() end); chamConn = nil end
+    if pulseThread then pcall(function() pulseThread:Disconnect() end); pulseThread = nil end
+    clearChams()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character then
+            for _, v in ipairs(plr.Character:GetDescendants()) do
+                if v:IsA("Highlight") then pcall(function() v:Destroy() end) end
+                if v:IsA("BasePart") then
+                    pcall(function()
+                        if v.Material == Enum.Material.Neon then
+                            v.Material = Enum.Material.Plastic
+                            v.Reflectance = 0
+                        end
+                        v.Transparency = 0
+                    end)
+                end
+            end
+        end
+    end
+    for _, conn in ipairs(allConnections) do
+        pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end)
+    end
+    allConnections = {}
+    clearESP()
+    pcall(function() if Window and Window.Remove then Window:Remove() end end)
+    pcall(function()
+        local gui = CoreGui:FindFirstChild("     ")
+        if gui and gui:IsA("ScreenGui") then gui:Destroy() end
+    end)
+    _G.hitboxEnabled = false
+    _G.espEnabled = false
+    _G.chamsEnabled = false
+    _G.fullbrightEnabled = false
+    _G.speedEnabled = false
+    _G.fovEnabled = false
+    print("✅ Полностью выгружен!")
+end
 
-hBtn.MouseButton1Down:Connect(function()
-    if hitboxEnabled then disableHitbox(); hSt.Text="STATUS: OFF"; hSt.TextColor3=Color3.fromRGB(255,0,0); hBtn.Text="ENABLE HITBOX EXPANDER"; hBtn.BackgroundColor3=Color3.fromRGB(200,0,0)
-    else hitboxSize=tonumber(sZ.Text) or 10; hitboxColor=Color3.fromRGB(math.clamp(tonumber(rB.Text) or 255,0,255), math.clamp(tonumber(gB.Text) or 255,0,255), math.clamp(tonumber(bB.Text) or 255,0,255)); enableHitbox(); hSt.Text="STATUS: ON"; hSt.TextColor3=Color3.fromRGB(0,255,0); hBtn.Text="DISABLE HITBOX EXPANDER"; hBtn.BackgroundColor3=Color3.fromRGB(0,180,0) end
-end)
-eBtn.MouseButton1Down:Connect(function()
-    if espEnabled then disableESP(); eSt.Text="STATUS: OFF"; eSt.TextColor3=Color3.fromRGB(255,0,0); eBtn.Text="ENABLE ESP"; eBtn.BackgroundColor3=Color3.fromRGB(200,0,0)
-    else nameEspColor=Color3.fromRGB(math.clamp(tonumber(nrB.Text) or 255,0,255), math.clamp(tonumber(ngB.Text) or 255,0,255), math.clamp(tonumber(nbB.Text) or 255,0,255)); boxEspColor=Color3.fromRGB(math.clamp(tonumber(brB.Text) or 255,0,255), math.clamp(tonumber(bgB.Text) or 255,0,255), math.clamp(tonumber(bbB.Text) or 255,0,255)); enableESP(); eSt.Text="STATUS: ON"; eSt.TextColor3=Color3.fromRGB(0,255,0); eBtn.Text="DISABLE ESP"; eBtn.BackgroundColor3=Color3.fromRGB(0,180,0) end
-end)
-lBtn.MouseButton1Down:Connect(function()
-    if fullbrightEnabled then disableFullbright(); lSt.Text="STATUS: OFF"; lSt.TextColor3=Color3.fromRGB(255,0,0); lBtn.Text="ENABLE FULLBRIGHT"; lBtn.BackgroundColor3=Color3.fromRGB(200,0,0)
-    else enableFullbright(); lSt.Text="STATUS: ON"; lSt.TextColor3=Color3.fromRGB(0,255,0); lBtn.Text="DISABLE FULLBRIGHT"; lBtn.BackgroundColor3=Color3.fromRGB(0,180,0) end
-end)
-sBtn.MouseButton1Down:Connect(function()
-    if speedEnabled then disableSpeed(); sSt.Text="STATUS: OFF"; sSt.TextColor3=Color3.fromRGB(255,0,0); sBtn.Text="ENABLE SPEEDHACK"; sBtn.BackgroundColor3=Color3.fromRGB(200,0,0)
-    else local n=tonumber(speedBox.Text) or 30; if n>40 then n=40; speedBox.Text="40" end; speedValue=n; enableSpeed(); sSt.Text="STATUS: ON ("..n..")"; sSt.TextColor3=Color3.fromRGB(0,255,0); sBtn.Text="DISABLE SPEEDHACK"; sBtn.BackgroundColor3=Color3.fromRGB(0,180,0) end
-end)
-fBtn.MouseButton1Down:Connect(function()
-    if fovEnabled then disableFOV(); fSt.Text="STATUS: OFF"; fSt.TextColor3=Color3.fromRGB(255,0,0); fBtn.Text="ENABLE FOV CHANGER"; fBtn.BackgroundColor3=Color3.fromRGB(200,0,0)
-    else local n=tonumber(fovBox.Text) or 90; if n>120 then n=120; fovBox.Text="120" elseif n<30 then n=30; fovBox.Text="30" end; fovValue=n; enableFOV(); fSt.Text="STATUS: ON ("..n..")"; fSt.TextColor3=Color3.fromRGB(0,255,0); fBtn.Text="DISABLE FOV CHANGER"; fBtn.BackgroundColor3=Color3.fromRGB(0,180,0) end
-end)
-un.MouseButton1Down:Connect(function() disableHitbox(); disableESP(); disableFullbright(); disableSpeed(); disableFOV(); gui:Destroy() end)
-_G.uninject=function() disableHitbox(); disableESP(); disableFullbright(); disableSpeed(); disableFOV(); gui:Destroy() end
-LocalPlayer.CharacterAdded:Connect(function() if hitboxEnabled then task.wait(0.3); enableHitbox() end; if espEnabled then task.wait(0.3); enableESP() end; if speedEnabled then task.wait(0.3); enableSpeed() end; if fovEnabled then task.wait(0.3); enableFOV() end; if fullbrightEnabled then task.wait(0.3); enableFullbright() end end)
-print("zimon4ik v1.1 | RGB Fixed | Xeno")
+-- ============================================================
+-- UI
+-- ============================================================
+
+-- Combat
+local CombatSection = CombatTab:CreateSection({ Name = "HITBOX" })
+CombatSection:AddToggle({ Name = "ENABLE HITBOX", Flag = "hitbox_enabled", Callback = function(v) if v then enableHitbox() else disableHitbox() end end })
+CombatSection:AddSlider({ Name = "HITBOX SIZE", Flag = "hitbox_size", Value = 10, Min = 1, Max = 30, Callback = function(v) _G.hitboxSize = v if _G.hitboxEnabled then expandHitboxes() end end })
+CombatSection:AddColorpicker({ Name = "HITBOX COLOR", Flag = "hitbox_color", Value = Color3.fromRGB(255, 255, 255), Callback = function(c) _G.hitboxColor = c if _G.hitboxEnabled then expandHitboxes() end end })
+
+-- Visuals
+local VisualsSection = VisualTab:CreateSection({ Name = "ESP SETTINGS" })
+VisualsSection:AddToggle({ Name = "ENABLE ESP", Flag = "esp_enabled", Callback = function(v) if v then enableESP() else disableESP() end end })
+VisualsSection:AddToggle({ Name = "NAME ESP", Flag = "name_esp", Default = false, Callback = function(v) _G.nameEspEnabled = v if _G.espEnabled then updateESP() end end })
+VisualsSection:AddToggle({ Name = "BOX ESP", Flag = "box_esp", Default = false, Callback = function(v) _G.boxEspEnabled = v if _G.espEnabled then updateESP() end end })
+VisualsSection:AddToggle({ Name = "HEALTH BAR", Flag = "health_bar", Default = false, Callback = function(v) _G.healthBarEnabled = v if _G.espEnabled then updateESP() end end })
+VisualsSection:AddColorpicker({ Name = "NAME COLOR", Flag = "name_esp_color", Value = Color3.fromRGB(255, 255, 255), Callback = function(c) _G.nameEspColor = c if _G.espEnabled then updateESP() end end })
+VisualsSection:AddColorpicker({ Name = "BOX COLOR", Flag = "box_esp_color", Value = Color3.fromRGB(255, 255, 255), Callback = function(c) _G.boxEspColor = c if _G.espEnabled then updateESP() end end })
+
+local ChamsSection = VisualTab:CreateSection({ Name = "CHAMS" })
+ChamsSection:AddToggle({ Name = "ENABLE CHAMS", Flag = "chams_enabled", Callback = function(v) if v then enableChams() else disableChams() end end })
+ChamsSection:AddDropdown({ Name = "CHAMS MODE", Flag = "chams_mode", List = {"Glow", "Wireframe", "Pulse"}, Value = "Glow", Callback = function(v) _G.chamsMode = v if _G.chamsEnabled then applyChams() end end })
+ChamsSection:AddColorpicker({ Name = "CHAMS COLOR", Flag = "chams_color", Value = Color3.fromRGB(255, 0, 0), Callback = function(c) _G.chamsColor = c if _G.chamsEnabled then applyChams() end end })
+
+local FogSection = VisualTab:CreateSection({ Name = "FOG" })
+FogSection:AddToggle({ Name = "ENABLE FOG", Flag = "fog_enabled", Callback = function(v) _G.fogEnabled = v applyFog() end })
+FogSection:AddColorpicker({ Name = "FOG COLOR", Flag = "fog_color", Value = Color3.fromRGB(255, 255, 255), Callback = function(c) _G.fogColor = c if _G.fogEnabled then applyFog() end end })
+FogSection:AddButton({ Name = "RESET FOG", Callback = function() _G.fogEnabled = false _G.fogColor = Color3.fromRGB(255, 255, 255) applyFog() print("✅ Fog сброшен") end })
+
+-- Misc
+local MiscSection = MiscTab:CreateSection({ Name = "FULLBRIGHT" })
+MiscSection:AddToggle({ Name = "ENABLE FULLBRIGHT", Flag = "fullbright_enabled", Callback = function(v) if v then enableFullbright() else disableFullbright() end end })
+local SpeedSection = MiscTab:CreateSection({ Name = "SPEEDHACK" })
+SpeedSection:AddToggle({ Name = "ENABLE SPEEDHACK", Flag = "speed_enabled", Callback = function(v) if v then enableSpeed() else disableSpeed() end end })
+SpeedSection:AddSlider({ Name = "SPEED VALUE", Flag = "speed_value", Value = 30, Min = 10, Max = 60, Callback = function(v) _G.speedValue = v end })
+local FovSection = MiscTab:CreateSection({ Name = "FIELD OF VIEW" })
+FovSection:AddToggle({ Name = "ENABLE FOV", Flag = "fov_enabled", Callback = function(v) if v then enableFOV() else disableFOV() end end })
+FovSection:AddSlider({ Name = "FOV VALUE", Flag = "fov_value", Value = 90, Min = 30, Max = 120, Callback = function(v) _G.fovValue = v if _G.fovEnabled then pcall(function() Camera.FieldOfView = v end) end end })
+
+-- Settings
+local UnInjectSection = SettingsTab:CreateSection({ Name = "UNINJECT" })
+UnInjectSection:AddButton({ Name = "UNINJECT", Callback = idealUninject })
+
+print("✅ zimon4ik.hook v3.0 загружен!")
+print("Клавиши: V - скрыть UI, C - AutoJump")
