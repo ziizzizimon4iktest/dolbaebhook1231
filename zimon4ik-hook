@@ -1,31 +1,49 @@
 -- ============================================================
--- ZIMON4IK.HOOK V3.0 — ULTIMATE EDITION (CLEAN)
+-- ZIMON4IK.HOOK V3.0 — LINORIALIB EDITION (FIXED KEY)
 -- ============================================================
 
 print("Загрузка zimon4ik.hook v3.0...")
 
-local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
-local Wait = library.subs.Wait
+-- ============================================================
+-- LINORIALIB
+-- ============================================================
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ForceCheckbox = false
+Library.ShowToggleFrameInKeybinds = true
 
 -- ============================================================
--- СОЗДАЁМ ОКНО (БЕЗ ЛИШНЕГО)
+-- СОЗДАЁМ ОКНО
 -- ============================================================
-local Window = library:CreateWindow({
-    Name = "zimon4ik.hook v3.0"
+local Window = Library:CreateWindow({
+    Title = "zimon4ik.hook v3.0",
+    Footer = "XENO | Made by zimon4ik",
+    Icon = 95816097006870,
+    NotifySide = "Right",
+    ShowCustomCursor = true,
 })
 
 -- ============================================================
--- ФИКС: КЛАВИША V ДЛЯ СКРЫТИЯ UI
+-- КЛАВИША V ДЛЯ МЕНЮ (ФИКС)
 -- ============================================================
-library.configuration.hideKeybind = Enum.KeyCode.V
+-- Сначала устанавливаем дефолтную клавишу
+Library.ToggleKeybind = "V"
 
 -- ============================================================
 -- ВКЛАДКИ
 -- ============================================================
-local CombatTab = Window:CreateTab({ Name = "Combat" })
-local VisualTab = Window:CreateTab({ Name = "Visuals" })
-local MiscTab = Window:CreateTab({ Name = "Misc" })
-local SettingsTab = Window:CreateTab({ Name = "Settings" })
+local Tabs = {
+    Combat = Window:AddTab("Combat", "swords"),
+    Visuals = Window:AddTab("Visuals", "eye"),
+    Misc = Window:AddTab("Misc", "settings"),
+    ["UI Settings"] = Window:AddTab("UI Settings", "palette"),
+}
 
 -- ============================================================
 -- ГЛОБАЛЬНЫЕ НАСТРОЙКИ
@@ -56,7 +74,6 @@ _G.fogColor = Color3.fromRGB(255, 255, 255)
 
 _G.autojumpEnabled = false
 
-local blur = nil
 local autojumpThread = nil
 
 -- ============================================================
@@ -72,34 +89,6 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 -- ============================================================
--- BLUR
--- ============================================================
-local function enableBlur()
-    if not blur or not blur.Parent then
-        blur = Instance.new("BlurEffect")
-        blur.Parent = Lighting
-    end
-    blur.Enabled = true
-    TweenService:Create(blur, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 20}):Play()
-end
-
-local function disableBlur()
-    if not blur then return end
-    TweenService:Create(blur, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = 0}):Play()
-    task.delay(0.3, function()
-        if blur then blur.Enabled = false end
-    end)
-end
-
-local function destroyBlur()
-    if blur then
-        blur.Enabled = false
-        pcall(function() blur:Destroy() end)
-        blur = nil
-    end
-end
-
--- ============================================================
 -- ФУНКЦИИ
 -- ============================================================
 local hitboxConn = nil
@@ -111,6 +100,8 @@ local speedConn = nil
 local fovConn = nil
 local fovLoopThread = nil
 local allConnections = {}
+local espObjects = {}
+local espConn = nil
 
 local function addConnection(conn)
     if conn then
@@ -177,26 +168,20 @@ local function enableHitbox()
         expandHitboxes()
     end))
     expandHitboxes()
-    print("✅ Hitbox включён, размер:", _G.hitboxSize)
+    Library:Notify({Title = "Hitbox", Description = "Hitbox включён!", Time = 3})
 end
 
 local function disableHitbox()
     if not _G.hitboxEnabled then return end
     _G.hitboxEnabled = false
-    if hitboxConn then 
-        hitboxConn:Disconnect()
-        hitboxConn = nil
-    end
+    if hitboxConn then hitboxConn:Disconnect(); hitboxConn = nil end
     resetHitboxes()
-    print("✅ Hitbox выключен")
+    Library:Notify({Title = "Hitbox", Description = "Hitbox выключен!", Time = 3})
 end
 
 -- ============================================================
 -- ESP
 -- ============================================================
-local espObjects = {}
-local espConn = nil
-
 local function clearESP()
     for _, obj in ipairs(espObjects) do
         pcall(function() obj:Remove() end)
@@ -376,12 +361,14 @@ local function enableESP()
         updateESP()
         renderESP()
     end))
+    Library:Notify({Title = "ESP", Description = "ESP включён!", Time = 3})
 end
 
 local function disableESP()
     _G.espEnabled = false
     if espConn then espConn:Disconnect(); espConn = nil end
     clearESP()
+    Library:Notify({Title = "ESP", Description = "ESP выключен!", Time = 3})
 end
 
 -- ============================================================
@@ -534,7 +521,7 @@ local function enableChams()
         task.wait(1)
         if _G.chamsEnabled then applyChams() end
     end))
-    print("✅ Chams включены")
+    Library:Notify({Title = "Chams", Description = "Chams включены!", Time = 3})
 end
 
 local function disableChams()
@@ -557,7 +544,7 @@ local function disableChams()
             end
         end
     end
-    print("✅ Chams выключены")
+    Library:Notify({Title = "Chams", Description = "Chams выключены!", Time = 3})
 end
 
 -- ============================================================
@@ -573,6 +560,7 @@ local function enableFullbright()
             Lighting.GlobalShadows = false
         end)
     end))
+    Library:Notify({Title = "Fullbright", Description = "Fullbright включён!", Time = 3})
 end
 
 local function disableFullbright()
@@ -582,6 +570,7 @@ local function disableFullbright()
         Lighting.Brightness = 1
         Lighting.GlobalShadows = true
     end)
+    Library:Notify({Title = "Fullbright", Description = "Fullbright выключен!", Time = 3})
 end
 
 local function enableSpeed()
@@ -598,6 +587,7 @@ local function enableSpeed()
             end
         end)
     end))
+    Library:Notify({Title = "Speedhack", Description = "Speedhack включён!", Time = 3})
 end
 
 local function disableSpeed()
@@ -610,6 +600,7 @@ local function disableSpeed()
             if hum then hum.WalkSpeed = 16 end
         end
     end)
+    Library:Notify({Title = "Speedhack", Description = "Speedhack выключен!", Time = 3})
 end
 
 local function enableFOV()
@@ -630,7 +621,7 @@ local function enableFOV()
             end)
         end
     end))
-    print("✅ FOV включён:", _G.fovValue)
+    Library:Notify({Title = "FOV", Description = "FOV включён: " .. _G.fovValue, Time = 3})
 end
 
 local function disableFOV()
@@ -639,7 +630,7 @@ local function disableFOV()
     if fovConn then fovConn:Disconnect(); fovConn = nil end
     if fovLoopThread then pcall(function() fovLoopThread:Disconnect() end); fovLoopThread = nil end
     pcall(function() Camera.FieldOfView = 70 end)
-    print("✅ FOV выключен")
+    Library:Notify({Title = "FOV", Description = "FOV выключен!", Time = 3})
 end
 
 -- ============================================================
@@ -663,65 +654,31 @@ local function applyFog()
 end
 
 -- ============================================================
--- AUTOJUMP
--- ============================================================
-local function toggleAutojump()
-    _G.autojumpEnabled = not _G.autojumpEnabled
-    if _G.autojumpEnabled then
-        print("✅ AutoJump ВКЛЮЧЁН (C)")
-        if autojumpThread then pcall(function() autojumpThread:Disconnect() end); autojumpThread = nil end
-        autojumpThread = RunService.Heartbeat:Connect(function()
-            if not _G.autojumpEnabled then return end
-            pcall(function()
-                local char = LocalPlayer.Character
-                if char then
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    if hum and hum.PlatformStand == false then
-                        if hum.FloorMaterial ~= Enum.Material.Air then
-                            hum.Jump = true
-                        end
-                    end
-                end
-            end)
-        end)
-    else
-        print("❌ AutoJump ВЫКЛЮЧЁН")
-        if autojumpThread then pcall(function() autojumpThread:Disconnect() end); autojumpThread = nil end
-    end
-end
-
-addConnection(UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard then
-        if input.KeyCode.Name == "C" then
-            toggleAutojump()
-        end
-    end
-end))
-
--- ============================================================
 -- UNINJECT
 -- ============================================================
 local function idealUninject()
     print("Выгрузка zimon4ik.hook v3.0...")
-    destroyBlur()
+    
+    _G.autojumpEnabled = false
+    if autojumpThread then pcall(function() autojumpThread:Disconnect() end); autojumpThread = nil end
+    
     disableHitbox()
     disableESP()
     disableChams()
     disableFullbright()
     disableSpeed()
     disableFOV()
-    _G.autojumpEnabled = false
-    if autojumpThread then pcall(function() autojumpThread:Disconnect() end); autojumpThread = nil end
+    
     _G.fogEnabled = false
     pcall(function()
         Lighting.Fog = false
         Lighting.Technology = Enum.Technology.Future
     end)
-    _G.chamsEnabled = false
+    
     if chamConn then pcall(function() chamConn:Disconnect() end); chamConn = nil end
     if pulseThread then pcall(function() pulseThread:Disconnect() end); pulseThread = nil end
     clearChams()
+    
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr.Character then
             for _, v in ipairs(plr.Character:GetDescendants()) do
@@ -738,22 +695,23 @@ local function idealUninject()
             end
         end
     end
+    
     for _, conn in ipairs(allConnections) do
         pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end)
     end
     allConnections = {}
+    
     clearESP()
-    pcall(function() if Window and Window.Remove then Window:Remove() end end)
-    pcall(function()
-        local gui = CoreGui:FindFirstChild("     ")
-        if gui and gui:IsA("ScreenGui") then gui:Destroy() end
-    end)
+    
+    Library:Unload()
+    
     _G.hitboxEnabled = false
     _G.espEnabled = false
     _G.chamsEnabled = false
     _G.fullbrightEnabled = false
     _G.speedEnabled = false
     _G.fovEnabled = false
+    
     print("✅ Полностью выгружен!")
 end
 
@@ -761,44 +719,312 @@ end
 -- UI
 -- ============================================================
 
--- Combat
-local CombatSection = CombatTab:CreateSection({ Name = "HITBOX" })
-CombatSection:AddToggle({ Name = "ENABLE HITBOX", Flag = "hitbox_enabled", Callback = function(v) if v then enableHitbox() else disableHitbox() end end })
-CombatSection:AddSlider({ Name = "HITBOX SIZE", Flag = "hitbox_size", Value = 10, Min = 1, Max = 30, Callback = function(v) _G.hitboxSize = v if _G.hitboxEnabled then expandHitboxes() end end })
-CombatSection:AddColorpicker({ Name = "HITBOX COLOR", Flag = "hitbox_color", Value = Color3.fromRGB(255, 255, 255), Callback = function(c) _G.hitboxColor = c if _G.hitboxEnabled then expandHitboxes() end end })
+-- ============================================================
+-- COMBAT TAB
+-- ============================================================
+local CombatLeft = Tabs.Combat:AddLeftGroupbox("Hitbox", "box")
 
--- Visuals
-local VisualsSection = VisualTab:CreateSection({ Name = "ESP SETTINGS" })
-VisualsSection:AddToggle({ Name = "ENABLE ESP", Flag = "esp_enabled", Callback = function(v) if v then enableESP() else disableESP() end end })
-VisualsSection:AddToggle({ Name = "NAME ESP", Flag = "name_esp", Default = false, Callback = function(v) _G.nameEspEnabled = v if _G.espEnabled then updateESP() end end })
-VisualsSection:AddToggle({ Name = "BOX ESP", Flag = "box_esp", Default = false, Callback = function(v) _G.boxEspEnabled = v if _G.espEnabled then updateESP() end end })
-VisualsSection:AddToggle({ Name = "HEALTH BAR", Flag = "health_bar", Default = false, Callback = function(v) _G.healthBarEnabled = v if _G.espEnabled then updateESP() end end })
-VisualsSection:AddColorpicker({ Name = "NAME COLOR", Flag = "name_esp_color", Value = Color3.fromRGB(255, 255, 255), Callback = function(c) _G.nameEspColor = c if _G.espEnabled then updateESP() end end })
-VisualsSection:AddColorpicker({ Name = "BOX COLOR", Flag = "box_esp_color", Value = Color3.fromRGB(255, 255, 255), Callback = function(c) _G.boxEspColor = c if _G.espEnabled then updateESP() end end })
+CombatLeft:AddToggle("hitbox_enabled", {
+    Text = "Enable Hitbox",
+    Default = false,
+    Tooltip = "Включает хитбокс на игроках",
+    Callback = function(v)
+        if v then enableHitbox() else disableHitbox() end
+    end
+})
 
-local ChamsSection = VisualTab:CreateSection({ Name = "CHAMS" })
-ChamsSection:AddToggle({ Name = "ENABLE CHAMS", Flag = "chams_enabled", Callback = function(v) if v then enableChams() else disableChams() end end })
-ChamsSection:AddDropdown({ Name = "CHAMS MODE", Flag = "chams_mode", List = {"Glow", "Wireframe", "Pulse"}, Value = "Glow", Callback = function(v) _G.chamsMode = v if _G.chamsEnabled then applyChams() end end })
-ChamsSection:AddColorpicker({ Name = "CHAMS COLOR", Flag = "chams_color", Value = Color3.fromRGB(255, 0, 0), Callback = function(c) _G.chamsColor = c if _G.chamsEnabled then applyChams() end end })
+CombatLeft:AddSlider("hitbox_size", {
+    Text = "Hitbox Size",
+    Default = 10,
+    Min = 1,
+    Max = 30,
+    Rounding = 0,
+    Tooltip = "Размер хитбокса",
+    Callback = function(v)
+        _G.hitboxSize = v
+        if _G.hitboxEnabled then expandHitboxes() end
+    end
+})
 
-local FogSection = VisualTab:CreateSection({ Name = "FOG" })
-FogSection:AddToggle({ Name = "ENABLE FOG", Flag = "fog_enabled", Callback = function(v) _G.fogEnabled = v applyFog() end })
-FogSection:AddColorpicker({ Name = "FOG COLOR", Flag = "fog_color", Value = Color3.fromRGB(255, 255, 255), Callback = function(c) _G.fogColor = c if _G.fogEnabled then applyFog() end end })
-FogSection:AddButton({ Name = "RESET FOG", Callback = function() _G.fogEnabled = false _G.fogColor = Color3.fromRGB(255, 255, 255) applyFog() print("✅ Fog сброшен") end })
+CombatLeft:AddLabel("Hitbox Color"):AddColorPicker("hitbox_color", {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = "Hitbox Color",
+    Callback = function(c)
+        _G.hitboxColor = c
+        if _G.hitboxEnabled then expandHitboxes() end
+    end
+})
 
--- Misc
-local MiscSection = MiscTab:CreateSection({ Name = "FULLBRIGHT" })
-MiscSection:AddToggle({ Name = "ENABLE FULLBRIGHT", Flag = "fullbright_enabled", Callback = function(v) if v then enableFullbright() else disableFullbright() end end })
-local SpeedSection = MiscTab:CreateSection({ Name = "SPEEDHACK" })
-SpeedSection:AddToggle({ Name = "ENABLE SPEEDHACK", Flag = "speed_enabled", Callback = function(v) if v then enableSpeed() else disableSpeed() end end })
-SpeedSection:AddSlider({ Name = "SPEED VALUE", Flag = "speed_value", Value = 30, Min = 10, Max = 60, Callback = function(v) _G.speedValue = v end })
-local FovSection = MiscTab:CreateSection({ Name = "FIELD OF VIEW" })
-FovSection:AddToggle({ Name = "ENABLE FOV", Flag = "fov_enabled", Callback = function(v) if v then enableFOV() else disableFOV() end end })
-FovSection:AddSlider({ Name = "FOV VALUE", Flag = "fov_value", Value = 90, Min = 30, Max = 120, Callback = function(v) _G.fovValue = v if _G.fovEnabled then pcall(function() Camera.FieldOfView = v end) end end })
+-- ============================================================
+-- VISUALS TAB
+-- ============================================================
+-- ESP
+local EspLeft = Tabs.Visuals:AddLeftGroupbox("ESP Settings", "eye")
 
--- Settings
-local UnInjectSection = SettingsTab:CreateSection({ Name = "UNINJECT" })
-UnInjectSection:AddButton({ Name = "UNINJECT", Callback = idealUninject })
+EspLeft:AddToggle("esp_enabled", {
+    Text = "Enable ESP",
+    Default = false,
+    Tooltip = "Включает ESP",
+    Callback = function(v)
+        if v then enableESP() else disableESP() end
+    end
+})
 
+EspLeft:AddToggle("name_esp", {
+    Text = "Name ESP",
+    Default = false,
+    Tooltip = "Показывает имя игрока",
+    Callback = function(v)
+        _G.nameEspEnabled = v
+        if _G.espEnabled then updateESP() end
+    end
+})
+
+EspLeft:AddToggle("box_esp", {
+    Text = "Box ESP",
+    Default = false,
+    Tooltip = "Показывает рамку вокруг игрока",
+    Callback = function(v)
+        _G.boxEspEnabled = v
+        if _G.espEnabled then updateESP() end
+    end
+})
+
+EspLeft:AddToggle("health_bar", {
+    Text = "Health Bar",
+    Default = false,
+    Tooltip = "Показывает полоску здоровья",
+    Callback = function(v)
+        _G.healthBarEnabled = v
+        if _G.espEnabled then updateESP() end
+    end
+})
+
+EspLeft:AddLabel("Name Color"):AddColorPicker("name_esp_color", {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = "Name Color",
+    Callback = function(c)
+        _G.nameEspColor = c
+        if _G.espEnabled then updateESP() end
+    end
+})
+
+EspLeft:AddLabel("Box Color"):AddColorPicker("box_esp_color", {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = "Box Color",
+    Callback = function(c)
+        _G.boxEspColor = c
+        if _G.espEnabled then updateESP() end
+    end
+})
+
+-- Chams
+local ChamsCenter = Tabs.Visuals:AddLeftGroupbox("Chams", "palette")
+
+ChamsCenter:AddToggle("chams_enabled", {
+    Text = "Enable Chams",
+    Default = false,
+    Tooltip = "Включает чакмсы",
+    Callback = function(v)
+        if v then enableChams() else disableChams() end
+    end
+})
+
+ChamsCenter:AddDropdown("chams_mode", {
+    Values = {"Glow", "Wireframe", "Pulse"},
+    Default = 1,
+    Text = "Chams Mode",
+    Tooltip = "Режим чакмсов",
+    Callback = function(v)
+        _G.chamsMode = v
+        if _G.chamsEnabled then applyChams() end
+    end
+})
+
+ChamsCenter:AddLabel("Chams Color"):AddColorPicker("chams_color", {
+    Default = Color3.fromRGB(255, 0, 0),
+    Title = "Chams Color",
+    Callback = function(c)
+        _G.chamsColor = c
+        if _G.chamsEnabled then applyChams() end
+    end
+})
+
+-- Fog
+local FogRight = Tabs.Visuals:AddLeftGroupbox("Fog", "cloud")
+
+FogRight:AddToggle("fog_enabled", {
+    Text = "Enable Fog",
+    Default = false,
+    Tooltip = "Включает туман",
+    Callback = function(v)
+        _G.fogEnabled = v
+        applyFog()
+    end
+})
+
+FogRight:AddLabel("Fog Color"):AddColorPicker("fog_color", {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = "Fog Color",
+    Callback = function(c)
+        _G.fogColor = c
+        if _G.fogEnabled then applyFog() end
+    end
+})
+
+FogRight:AddButton({
+    Text = "Reset Fog",
+    Func = function()
+        _G.fogEnabled = false
+        _G.fogColor = Color3.fromRGB(255, 255, 255)
+        applyFog()
+        Library:Notify({Title = "Fog", Description = "Fog сброшен!", Time = 3})
+    end,
+    Tooltip = "Сбрасывает настройки тумана"
+})
+
+-- ============================================================
+-- MISC TAB
+-- ============================================================
+-- Fullbright
+local MiscLeft = Tabs.Misc:AddLeftGroupbox("Fullbright", "sun")
+
+MiscLeft:AddToggle("fullbright_enabled", {
+    Text = "Enable Fullbright",
+    Default = false,
+    Tooltip = "Включает полную яркость",
+    Callback = function(v)
+        if v then enableFullbright() else disableFullbright() end
+    end
+})
+
+-- Speedhack
+local MiscCenter = Tabs.Misc:AddLeftGroupbox("Speedhack", "gauge")
+
+MiscCenter:AddToggle("speed_enabled", {
+    Text = "Enable Speedhack",
+    Default = false,
+    Tooltip = "Включает ускорение",
+    Callback = function(v)
+        if v then enableSpeed() else disableSpeed() end
+    end
+})
+
+MiscCenter:AddSlider("speed_value", {
+    Text = "Speed Value",
+    Default = 30,
+    Min = 10,
+    Max = 60,
+    Rounding = 0,
+    Tooltip = "Значение скорости",
+    Callback = function(v)
+        _G.speedValue = v
+    end
+})
+
+-- FOV
+local MiscRight = Tabs.Misc:AddLeftGroupbox("FOV", "eye")
+
+MiscRight:AddToggle("fov_enabled", {
+    Text = "Enable FOV",
+    Default = false,
+    Tooltip = "Включает изменение FOV",
+    Callback = function(v)
+        if v then enableFOV() else disableFOV() end
+    end
+})
+
+MiscRight:AddSlider("fov_value", {
+    Text = "FOV Value",
+    Default = 90,
+    Min = 30,
+    Max = 120,
+    Rounding = 0,
+    Tooltip = "Значение FOV",
+    Callback = function(v)
+        _G.fovValue = v
+        if _G.fovEnabled then pcall(function() Camera.FieldOfView = v end) end
+    end
+})
+
+-- AutoJump
+local MiscAutoJump = Tabs.Misc:AddLeftGroupbox("AutoJump", "arrow-up")
+
+MiscAutoJump:AddToggle("autojump_enabled", {
+    Text = "Enable AutoJump (C)",
+    Default = false,
+    Tooltip = "Автоматические прыжки по клавише C",
+    Callback = function(v)
+        _G.autojumpEnabled = v
+        if v then
+            if autojumpThread then pcall(function() autojumpThread:Disconnect() end); autojumpThread = nil end
+            autojumpThread = RunService.Heartbeat:Connect(function()
+                if not _G.autojumpEnabled then return end
+                pcall(function()
+                    local char = LocalPlayer.Character
+                    if char then
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        if hum and hum.PlatformStand == false then
+                            if hum.FloorMaterial ~= Enum.Material.Air then
+                                hum.Jump = true
+                            end
+                        end
+                    end
+                end)
+            end)
+            Library:Notify({Title = "AutoJump", Description = "AutoJump включён! (C)", Time = 3})
+        else
+            if autojumpThread then pcall(function() autojumpThread:Disconnect() end); autojumpThread = nil end
+            Library:Notify({Title = "AutoJump", Description = "AutoJump выключен!", Time = 3})
+        end
+    end
+})
+
+-- ============================================================
+-- SETTINGS TAB
+-- ============================================================
+local SettingsGroup = Tabs["UI Settings"]:AddLeftGroupbox("Uninject", "power")
+
+SettingsGroup:AddButton({
+    Text = "UNINJECT",
+    Func = idealUninject,
+    Tooltip = "Полностью выгружает скрипт",
+    Risky = true
+})
+
+-- ============================================================
+-- КЛАВИША V ДЛЯ МЕНЮ (ТЕПЕРЬ ТОЧНО РАБОТАЕТ)
+-- ============================================================
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
+
+MenuGroup:AddLabel("Menu bind")
+    :AddKeyPicker("MenuKeybind", { 
+        Default = "V", 
+        NoUI = false, 
+        Text = "Menu keybind" 
+    })
+
+-- Устанавливаем клавишу для меню
+Library.ToggleKeybind = Options.MenuKeybind
+Options.MenuKeybind:SetValue("V")
+
+-- ============================================================
+-- ADDONS: SAVE MANAGER & THEME MANAGER
+-- ============================================================
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("zimon4ik-hook")
+SaveManager:SetFolder("zimon4ik-hook/settings")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+-- ============================================================
+-- ЗАПУСК
+-- ============================================================
 print("✅ zimon4ik.hook v3.0 загружен!")
-print("Клавиши: V - скрыть UI, C - AutoJump")
+print("Клавиша: V - открыть/закрыть меню")
